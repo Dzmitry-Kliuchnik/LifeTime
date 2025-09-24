@@ -21,6 +21,14 @@ const saveUserData = async () => {
     return
   }
 
+  const birthdateObj = new Date(birthdate.value)
+  const today = new Date()
+  
+  if (birthdateObj > today) {
+    error.value = 'Birthdate cannot be in the future'
+    return
+  }
+
   isLoading.value = true
   error.value = ''
 
@@ -42,6 +50,10 @@ const saveUserData = async () => {
   }
 }
 
+const closeModal = () => {
+  emit('close')
+}
+
 onMounted(() => {
   if (props.userData) {
     birthdate.value = props.userData.birthdate
@@ -51,279 +63,469 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="settings-overlay">
-    <div class="settings-modal">
-      <div class="modal-header">
-        <h2>⚙️ Settings</h2>
-        <button class="close-btn" @click="emit('close')">×</button>
+  <Teleport to="body">
+    <div class="modal-backdrop" @click="closeModal">
+      <div class="modal-container" @click.stop role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal-header">
+          <h2 id="settings-title" class="modal-title">
+            <span class="settings-icon">⚙️</span>
+            Settings
+          </h2>
+          <button 
+            class="modal-close" 
+            @click="closeModal"
+            aria-label="Close settings"
+          >
+            <span class="close-icon">×</span>
+          </button>
+        </div>
+
+        <form @submit.prevent="saveUserData" class="modal-body">
+          <div v-if="error" class="error-message" role="alert">
+            <span class="error-icon">⚠️</span>
+            {{ error }}
+          </div>
+
+          <div class="form-section">
+            <div class="form-group">
+              <label for="birthdate" class="form-label">Your Birthdate:</label>
+              <input
+                id="birthdate"
+                type="date"
+                v-model="birthdate"
+                required
+                class="form-input"
+                :disabled="isLoading"
+              />
+              <p class="form-help">This is used to calculate which weeks you've already lived</p>
+            </div>
+
+            <div class="form-group">
+              <label for="life-expectancy" class="form-label">Life Expectancy (years):</label>
+              <input
+                id="life-expectancy"
+                type="number"
+                v-model="lifeExpectancy"
+                min="1"
+                max="120"
+                required
+                class="form-input"
+                :disabled="isLoading"
+              />
+              <p class="form-help">Average life expectancy varies by country (typically 70-85 years)</p>
+            </div>
+          </div>
+
+          <div class="info-section">
+            <h3 class="info-title">About Lifetime Calendar</h3>
+            <p class="info-text">This calendar shows every week of your life as a box. Each row represents one year (52 weeks), and you can see:</p>
+            <ul class="legend-list">
+              <li class="legend-item">
+                <div class="legend-indicator lived"></div>
+                <span>Weeks you've already lived (filled)</span>
+              </li>
+              <li class="legend-item">
+                <div class="legend-indicator current"></div>
+                <span>Your current week (highlighted)</span>
+              </li>
+              <li class="legend-item">
+                <div class="legend-indicator future"></div>
+                <span>Future weeks (empty)</span>
+              </li>
+            </ul>
+            <p class="info-text">It's inspired by the "Your Life in Weeks" concept to help visualize time and make the most of it.</p>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" @click="closeModal" class="btn btn-secondary" :disabled="isLoading">
+              Cancel
+            </button>
+            <button type="submit" :disabled="isLoading" class="btn btn-primary">
+              <span v-if="isLoading" class="btn-spinner"></span>
+              <span class="btn-icon" v-if="!isLoading">💾</span>
+              {{ isLoading ? 'Saving...' : 'Save & Continue' }}
+            </button>
+          </div>
+        </form>
       </div>
-
-      <form @submit.prevent="saveUserData" class="settings-form">
-        <div class="form-group">
-          <label for="birthdate">Your Birthdate:</label>
-          <input
-            id="birthdate"
-            type="date"
-            v-model="birthdate"
-            required
-            class="form-input"
-          />
-          <small class="form-help">This is used to calculate which weeks you've already lived</small>
-        </div>
-
-        <div class="form-group">
-          <label for="life-expectancy">Life Expectancy (years):</label>
-          <input
-            id="life-expectancy"
-            type="number"
-            v-model="lifeExpectancy"
-            min="1"
-            max="120"
-            required
-            class="form-input"
-          />
-          <small class="form-help">Average life expectancy varies by country (typically 70-85 years)</small>
-        </div>
-
-        <div class="info-box">
-          <h3>About Lifetime Calendar</h3>
-          <p>This calendar shows every week of your life as a box. Each row represents one year (52 weeks), and you can see:</p>
-          <ul>
-            <li><span class="lived-box"></span> Weeks you've already lived (filled)</li>
-            <li><span class="current-box"></span> Your current week (highlighted)</li>
-            <li><span class="future-box"></span> Future weeks (empty)</li>
-          </ul>
-          <p>It's inspired by the "Your Life in Weeks" concept to help visualize time and make the most of it.</p>
-        </div>
-
-        <div v-if="error" class="error-message">
-          {{ error }}
-        </div>
-
-        <div class="form-actions">
-          <button type="button" @click="emit('close')" class="btn btn-secondary">
-            Cancel
-          </button>
-          <button type="submit" :disabled="isLoading" class="btn btn-primary">
-            {{ isLoading ? 'Saving...' : 'Save & Continue' }}
-          </button>
-        </div>
-      </form>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
-.settings-overlay {
+/* Modal Backdrop */
+.modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: var(--space-4);
+  animation: fadeIn var(--duration-normal) var(--ease-out);
 }
 
-.settings-modal {
-  background: white;
-  border-radius: 12px;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal Container */
+.modal-container {
+  background: var(--color-surface);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-2xl);
   width: 100%;
-  max-width: 500px;
+  max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: slideIn var(--duration-normal) var(--ease-out);
 }
 
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-20px) scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+  }
+}
+
+/* Modal Header */
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #eee;
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-background-secondary);
 }
 
-.modal-header h2 {
-  font-size: 1.5rem;
-  color: #333;
+.modal-title {
   margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.close-btn {
+.settings-icon {
+  font-size: var(--font-size-lg);
+}
+
+.modal-close {
   background: none;
   border: none;
-  font-size: 2rem;
-  color: #999;
+  color: var(--color-text-secondary);
   cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
+  padding: var(--space-2);
+  border-radius: var(--radius-full);
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
+  transition: var(--duration-fast) var(--ease-out);
 }
 
-.close-btn:hover {
-  background: #f5f5f5;
-  color: #666;
+.modal-close:hover {
+  background: var(--color-background-tertiary);
+  color: var(--color-text-primary);
 }
 
-.settings-form {
-  padding: 1.5rem;
+.close-icon {
+  font-size: var(--font-size-xl);
+  line-height: 1;
+}
+
+/* Modal Body */
+.modal-body {
+  padding: var(--space-6);
+  overflow-y: auto;
+}
+
+/* Error Message */
+.error-message {
+  background: var(--color-error-50);
+  border: 1px solid var(--color-error-200);
+  color: var(--color-error-700);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-6);
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.error-icon {
+  font-size: var(--font-size-base);
+  flex-shrink: 0;
+}
+
+/* Form Section */
+.form-section {
+  margin-bottom: var(--space-8);
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-6);
 }
 
-.form-group label {
+.form-label {
   display: block;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 0.5rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
 }
 
 .form-input {
   width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
-  transition: border-color 0.2s ease;
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-sans);
+  transition: var(--duration-fast) var(--ease-out);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.form-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--color-background-secondary);
 }
 
 .form-help {
-  display: block;
-  color: #666;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
 }
 
-.info-box {
-  background: #f8f9ff;
-  border: 1px solid #e1e5ff;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
+/* Info Section */
+.info-section {
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  margin-bottom: var(--space-8);
 }
 
-.info-box h3 {
-  color: #333;
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
+.info-title {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-4);
 }
 
-.info-box p {
-  color: #666;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  margin-bottom: 0.5rem;
+.info-text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  margin-bottom: var(--space-4);
 }
 
-.info-box ul {
-  margin: 0.5rem 0;
-  padding-left: 1rem;
+.legend-list {
+  margin: var(--space-4) 0;
+  padding: 0;
+  list-style: none;
 }
 
-.info-box li {
-  color: #666;
-  font-size: 0.875rem;
-  line-height: 1.5;
+.legend-item {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   display: flex;
   align-items: center;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-3);
+  gap: var(--space-3);
 }
 
-.lived-box, .current-box, .future-box {
-  width: 12px;
-  height: 12px;
-  border: 1px solid #ddd;
-  margin-right: 0.5rem;
-  border-radius: 2px;
+.legend-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
 }
 
-.lived-box {
-  background: #4ade80;
+.legend-indicator.lived {
+  background: var(--color-success-500);
+  border-color: var(--color-success-600);
 }
 
-.current-box {
-  background: #f59e0b;
-  border-color: #f59e0b;
+.legend-indicator.current {
+  background: var(--color-warning-500);
+  border-color: var(--color-warning-600);
+  animation: pulse-gentle 2s infinite;
 }
 
-.future-box {
-  background: white;
+@keyframes pulse-gentle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-.error-message {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 0.75rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
+.legend-indicator.future {
+  background: var(--color-surface);
+  border-color: var(--color-border);
 }
 
+/* Form Actions */
 .form-actions {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-3);
   justify-content: flex-end;
-  margin-top: 2rem;
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
 }
 
 .btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--duration-fast) var(--ease-out);
   border: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 120px;
+  justify-content: center;
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-background-tertiary);
+  color: var(--color-text-secondary);
 }
 
-.btn-secondary:hover {
-  background: #e5e7eb;
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-500);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-600);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
-.btn-primary:disabled {
-  opacity: 0.7;
+.btn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none !important;
 }
 
-@media (max-width: 480px) {
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: var(--radius-full);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.btn-icon {
+  font-size: var(--font-size-base);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .info-section {
+    background: var(--color-primary-950);
+    border-color: var(--color-primary-800);
+  }
+  
+  .error-message {
+    background: var(--color-error-950);
+    border-color: var(--color-error-800);
+    color: var(--color-error-200);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .modal-container {
+    margin: var(--space-4);
+    max-height: calc(100vh - 2rem);
+  }
+  
+  .modal-header,
+  .modal-body {
+    padding: var(--space-4);
+  }
+  
   .form-actions {
     flex-direction: column;
+    gap: var(--space-2);
   }
   
   .btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-title {
+    font-size: var(--font-size-lg);
+  }
+  
+  .form-section {
+    margin-bottom: var(--space-6);
+  }
+  
+  .info-section {
+    padding: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal-container,
+  .legend-indicator.current,
+  .btn-spinner {
+    animation: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .form-input {
+    border-width: 3px;
+  }
+  
+  .legend-indicator {
+    border-width: 3px;
   }
 }
 </style>

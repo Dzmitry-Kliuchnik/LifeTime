@@ -1,35 +1,73 @@
 @import './base.css';
 
+/* Modern App Layout */
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+  min-height: 100vh;
+  font-weight: var(--font-weight-normal);
+  background: var(--color-background);
+  color: var(--color-text-primary);
 }
 
-a,
-.green {
+/* Modern Link Styles */
+a {
+  color: var(--color-primary-600);
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+  font-weight: var(--font-weight-medium);
+  transition: var(--duration-fast) var(--ease-out);
+  transition-property: color, background-color;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+  margin: calc(var(--space-1) * -1);
 }
 
-@media (hover: hover) {
+a:hover {
+  color: var(--color-primary-700);
+  background-color: var(--color-primary-50);
+}
+
+a:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
   a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
+    background-color: var(--color-primary-900);
   }
 }
 
+.green {
+  color: var(--color-success-600);
+}
+
+.green:hover {
+  color: var(--color-success-700);
+  background-color: var(--color-success-50);
+}
+
+@media (prefers-color-scheme: dark) {
+  .green:hover {
+    background-color: var(--color-success-900);
+  }
+}
+
+/* Responsive Layout - Mobile First */
+@media (min-width: 768px) {
+  #app {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Remove Vue default grid layout for this app */
 @media (min-width: 1024px) {
   body {
-    display: flex;
-    place-items: center;
+    display: block;
   }
 
   #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
   }
 }
