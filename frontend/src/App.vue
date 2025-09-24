@@ -14,29 +14,39 @@ const darkMode = ref(false)
 // Theme management
 const initTheme = () => {
   const savedTheme = localStorage.getItem('lifetime-calendar-theme')
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   
-  if (savedTheme) {
+  if (savedTheme && (savedTheme === 'dark' || savedTheme === 'light')) {
+    // Use saved preference
     darkMode.value = savedTheme === 'dark'
+    updateTheme()
   } else {
+    // Use system preference and save it
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     darkMode.value = prefersDark
+    localStorage.setItem('lifetime-calendar-theme', prefersDark ? 'dark' : 'light')
+    updateTheme()
   }
-  
-  updateTheme()
 }
 
 const toggleTheme = () => {
   darkMode.value = !darkMode.value
-  localStorage.setItem('lifetime-calendar-theme', darkMode.value ? 'dark' : 'light')
+  const newTheme = darkMode.value ? 'dark' : 'light'
+  localStorage.setItem('lifetime-calendar-theme', newTheme)
   updateTheme()
 }
 
 const updateTheme = () => {
-  if (darkMode.value) {
-    document.documentElement.setAttribute('data-theme', 'dark')
-  } else {
-    document.documentElement.removeAttribute('data-theme')
+  const theme = darkMode.value ? 'dark' : 'light'
+  document.documentElement.setAttribute('data-theme', theme)
+  
+  // Also update meta theme-color for better mobile experience
+  let metaThemeColor = document.querySelector('meta[name="theme-color"]')
+  if (!metaThemeColor) {
+    metaThemeColor = document.createElement('meta')
+    metaThemeColor.name = 'theme-color'
+    document.head.appendChild(metaThemeColor)
   }
+  metaThemeColor.content = darkMode.value ? '#0a0a0a' : '#f0f9ff'
 }
 
 const loadUserData = async () => {
@@ -64,9 +74,31 @@ const openSettings = () => {
   showSettings.value = true
 }
 
+// Listen for system theme changes when no manual preference is set
+const handleSystemThemeChange = (e) => {
+  const savedTheme = localStorage.getItem('lifetime-calendar-theme')
+  // Only respond to system changes if user hasn't manually set a preference
+  if (!savedTheme || savedTheme === 'system') {
+    darkMode.value = e.matches
+    updateTheme()
+  }
+}
+
 onMounted(() => {
   initTheme()
   loadUserData()
+  
+  // Listen for system theme changes
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  mediaQuery.addEventListener('change', handleSystemThemeChange)
+  
+  // Cleanup listener on unmount
+  const cleanup = () => {
+    mediaQuery.removeEventListener('change', handleSystemThemeChange)
+  }
+  
+  // Store cleanup function for potential use
+  window.addEventListener('beforeunload', cleanup)
 })
 </script>
 
@@ -87,6 +119,7 @@ onMounted(() => {
             class="theme-toggle-btn" 
             @click="toggleTheme"
             :aria-label="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+            :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
           >
             <span class="theme-icon">{{ darkMode ? '☀️' : '🌙' }}</span>
           </button>
@@ -96,6 +129,7 @@ onMounted(() => {
             @click="openSettings"
             :disabled="isLoading"
             aria-label="Open settings"
+            title="Open settings"
           >
             <span class="settings-icon">⚙️</span>
             <span class="settings-text">Settings</span>
@@ -499,24 +533,6 @@ onMounted(() => {
   
   .skeleton-grid {
     grid-template-columns: repeat(13, 1fr);
-  }
-}
-
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .header {
-    background: linear-gradient(135deg, var(--color-primary-700) 0%, var(--color-primary-900) 100%);
-  }
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .settings-btn {
-    border: 2px solid var(--color-text-inverse);
-  }
-  
-  .loading-spinner {
-    border-width: 4px;
   }
 }
 
