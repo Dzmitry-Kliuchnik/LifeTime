@@ -15,6 +15,12 @@ const selectedWeek = ref(null)
 const showWeekModal = ref(false)
 const weekNote = ref('')
 
+// Voice recording state
+const isRecording = ref(false)
+const isProcessing = ref(false)
+const speechSupported = ref(false)
+const recognition = ref(null)
+
 const loadCalendarData = async () => {
   isLoading.value = true
   error.value = ''
@@ -153,7 +159,78 @@ const getYearLabels = () => {
 
 onMounted(() => {
   loadCalendarData()
+  initializeSpeechRecognition()
 })
+
+// Initialize Speech Recognition
+const initializeSpeechRecognition = () => {
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    speechSupported.value = true
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    recognition.value = new SpeechRecognition()
+    
+    recognition.value.continuous = false
+    recognition.value.interimResults = false
+    recognition.value.lang = 'en-US'
+    
+    recognition.value.onstart = () => {
+      isRecording.value = true
+      isProcessing.value = false
+    }
+    
+    recognition.value.onresult = (event) => {
+      const transcript = event.results[0][0].transcript
+      if (transcript.trim()) {
+        // Append transcribed text to existing note
+        const currentNote = weekNote.value
+        const separator = currentNote && currentNote.trim() ? '\n\n' : ''
+        weekNote.value = currentNote + separator + transcript.trim()
+      }
+    }
+    
+    recognition.value.onerror = (event) => {
+      console.error('Speech recognition error:', event.error)
+      isRecording.value = false
+      isProcessing.value = false
+      alert(`Voice recognition error: ${event.error}`)
+    }
+    
+    recognition.value.onend = () => {
+      isRecording.value = false
+      isProcessing.value = false
+    }
+  } else {
+    speechSupported.value = false
+  }
+}
+
+// Start voice recording
+const startVoiceRecording = () => {
+  if (!speechSupported.value || !recognition.value) {
+    alert('Voice recording is not supported in this browser.')
+    return
+  }
+  
+  if (isRecording.value) {
+    return
+  }
+  
+  try {
+    isProcessing.value = true
+    recognition.value.start()
+  } catch (error) {
+    console.error('Error starting voice recognition:', error)
+    isProcessing.value = false
+    alert('Failed to start voice recording. Please try again.')
+  }
+}
+
+// Stop voice recording
+const stopVoiceRecording = () => {
+  if (recognition.value && isRecording.value) {
+    recognition.value.stop()
+  }
+}
 </script>
 
 <template>
@@ -346,7 +423,38 @@ onMounted(() => {
             </div>
 
             <div class="note-section">
-              <label for="week-note" class="note-label">Week Note</label>
+              <div class="note-header">
+                <label for="week-note" class="note-label">Week Note</label>
+                <div class="voice-controls" v-if="speechSupported">
+                  <button
+                    v-if="!isRecording && !isProcessing"
+                    @click="startVoiceRecording"
+                    class="voice-btn voice-btn-start"
+                    type="button"
+                    :title="'Click to start voice recording'"
+                  >
+                    <span class="voice-icon">🎤</span>
+                    <span class="voice-text">Record</span>
+                  </button>
+                  <button
+                    v-else-if="isRecording"
+                    @click="stopVoiceRecording"
+                    class="voice-btn voice-btn-recording"
+                    type="button"
+                    title="Click to stop recording"
+                  >
+                    <span class="voice-icon recording">🔴</span>
+                    <span class="voice-text">Stop</span>
+                  </button>
+                  <div
+                    v-else-if="isProcessing"
+                    class="voice-btn voice-btn-processing"
+                  >
+                    <span class="voice-icon">⏳</span>
+                    <span class="voice-text">Starting...</span>
+                  </div>
+                </div>
+              </div>
               <textarea
                 id="week-note"
                 v-model="weekNote"
@@ -354,6 +462,12 @@ onMounted(() => {
                 rows="4"
                 class="note-input"
               ></textarea>
+              <div v-if="speechSupported" class="voice-hint">
+                💡 Tip: Use the Record button to add voice notes. They will be appended to your existing text.
+              </div>
+              <div v-else class="voice-unsupported">
+                ⚠️ Voice recording is not supported in this browser.
+              </div>
             </div>
           </div>
 
@@ -991,12 +1105,116 @@ onMounted(() => {
   margin-bottom: var(--space-6);
 }
 
+.note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .note-label {
   display: block;
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  margin-bottom: var(--space-3);
   font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.voice-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.voice-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--duration-fast) var(--ease-out);
+  min-width: 80px;
+  justify-content: center;
+}
+
+.voice-btn-start:hover {
+  background: var(--color-success-50);
+  border-color: var(--color-success-300);
+  color: var(--color-success-700);
+}
+
+.voice-btn-recording {
+  background: var(--color-error-50);
+  border-color: var(--color-error-300);
+  color: var(--color-error-700);
+  animation: pulse-recording 1.5s infinite;
+}
+
+.voice-btn-recording:hover {
+  background: var(--color-error-100);
+  border-color: var(--color-error-400);
+}
+
+.voice-btn-processing {
+  background: var(--color-warning-50);
+  border-color: var(--color-warning-300);
+  color: var(--color-warning-700);
+  cursor: not-allowed;
+}
+
+@keyframes pulse-recording {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+.voice-icon {
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
+.voice-icon.recording {
+  animation: pulse-gentle 1s infinite;
+}
+
+.voice-text {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.voice-hint {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-md);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.voice-unsupported {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-warning-50);
+  border: 1px solid var(--color-warning-200);
+  border-radius: var(--radius-md);
+  color: var(--color-warning-700);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
 }
 
 .note-input {
@@ -1122,6 +1340,22 @@ onMounted(() => {
   
   .btn {
     justify-content: center;
+  }
+  
+  .note-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  
+  .voice-controls {
+    align-self: stretch;
+    justify-content: center;
+  }
+  
+  .voice-btn {
+    flex: 1;
+    min-width: 0;
   }
 }
 
