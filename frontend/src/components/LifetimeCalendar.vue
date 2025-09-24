@@ -563,12 +563,20 @@ onMounted(() => {
 
 /* Legend */
 .legend-container {
-  background: var(--color-surface);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   padding: var(--space-6);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
   margin-bottom: var(--space-8);
+  transition: var(--duration-normal) var(--ease-out);
+}
+
+.legend-container:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
 }
 
 .legend-title {
@@ -658,11 +666,18 @@ onMounted(() => {
 
 /* Calendar Section */
 .calendar-section {
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-lg);
-  border: 1px solid var(--color-border);
   overflow: hidden;
+  transition: var(--duration-normal) var(--ease-out);
+}
+
+.calendar-section:hover {
+  box-shadow: var(--shadow-xl);
 }
 
 .calendar-grid {
@@ -710,13 +725,15 @@ onMounted(() => {
   background: var(--color-surface);
   cursor: pointer;
   transition: var(--duration-fast) var(--ease-out);
+  transition-property: transform, box-shadow, background-color, border-color;
   position: relative;
 }
 
 .week-box:hover {
-  transform: scale(1.3);
+  transform: scale(1.4);
   z-index: 10;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
+  border-width: 2px;
 }
 
 .week-box:focus {
@@ -725,16 +742,31 @@ onMounted(() => {
   z-index: 10;
 }
 
+.week-box:active {
+  transform: scale(1.2);
+}
+
 .week-box.lived {
-  background: var(--color-success-500);
+  background: linear-gradient(135deg, var(--color-success-500), var(--color-success-600));
   border-color: var(--color-success-600);
+  box-shadow: 0 0 3px rgba(34, 197, 94, 0.3);
+}
+
+.week-box.lived:hover {
+  background: linear-gradient(135deg, var(--color-success-400), var(--color-success-500));
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
 }
 
 .week-box.current {
-  background: var(--color-warning-500);
+  background: linear-gradient(135deg, var(--color-warning-500), var(--color-warning-600));
   border-color: var(--color-warning-600);
   animation: pulse-gentle 2s infinite;
-  box-shadow: 0 0 8px var(--color-warning-300);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.week-box.current:hover {
+  background: linear-gradient(135deg, var(--color-warning-400), var(--color-warning-500));
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
 }
 
 .week-box.has-note {
@@ -759,8 +791,9 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -770,16 +803,27 @@ onMounted(() => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { 
+    opacity: 0; 
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to { 
+    opacity: 1; 
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }
 
 .modal-container {
-  background: var(--color-surface);
-  border-radius: var(--radius-2xl);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-3xl);
   box-shadow: var(--shadow-2xl);
   width: 100%;
-  max-width: 500px;
+  max-width: 520px;
   max-height: 90vh;
   overflow: hidden;
   animation: slideIn var(--duration-normal) var(--ease-out);
