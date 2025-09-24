@@ -291,6 +291,28 @@ onMounted(() => {
   border-radius: 2px;
 }
 
+.legend-box.lived {
+  background: #4ade80;
+  border-color: #22c55e;
+}
+
+.legend-box.current {
+  background: #f59e0b;
+  border-color: #d97706;
+  animation: pulse 2s infinite;
+}
+
+.legend-box.future {
+  background: white;
+  border-color: #e5e7eb;
+}
+
+.legend-box.has-note {
+  background: white;
+  border-color: #e5e7eb;
+  box-shadow: inset 0 0 0 2px #8b5cf6;
+}
+
 .calendar-grid {
   background: white;
   border-radius: 8px;
