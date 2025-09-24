@@ -457,20 +457,6 @@ onMounted(() => {
   font-size: var(--font-size-base);
 }
 
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .info-section {
-    background: var(--color-primary-950);
-    border-color: var(--color-primary-800);
-  }
-  
-  .error-message {
-    background: var(--color-error-950);
-    border-color: var(--color-error-800);
-    color: var(--color-error-200);
-  }
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
   .modal-container {
