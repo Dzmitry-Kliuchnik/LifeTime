@@ -100,6 +100,18 @@ const getWeekClass = (week) => {
   return classes.join(' ')
 }
 
+const getStatusClass = (week) => {
+  if (week.is_current) return 'status-current'
+  if (week.is_lived) return 'status-lived'
+  return 'status-future'
+}
+
+const getStatusText = (week) => {
+  if (week.is_current) return 'Current Week'
+  if (week.is_lived) return 'Lived'
+  return 'Future'
+}
+
 onMounted(() => {
   loadCalendarData()
 })
@@ -107,499 +119,1028 @@ onMounted(() => {
 
 <template>
   <div class="lifetime-calendar">
-    <div v-if="isLoading" class="loading">
-      Loading your lifetime calendar...
+    <!-- Loading State -->
+    <div v-if="isLoading" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Loading your lifetime calendar...</p>
     </div>
 
-    <div v-else-if="error" class="error">
-      {{ error }}
+    <!-- Error State -->
+    <div v-else-if="error" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h3 class="error-title">Unable to load calendar</h3>
+      <p class="error-message">{{ error }}</p>
+      <button @click="loadCalendarData" class="retry-btn">
+        <span class="retry-icon">↻</span>
+        Try Again
+      </button>
     </div>
 
+    <!-- Calendar Content -->
     <div v-else-if="calendarData" class="calendar-container">
-      <!-- Statistics -->
-      <div class="stats">
-        <div class="stat-item">
-          <div class="stat-number">{{ calendarData.lived_weeks }}</div>
-          <div class="stat-label">Weeks Lived</div>
+      <!-- Statistics Cards -->
+      <div class="stats-grid">
+        <div class="stat-card glass-card lived-card">
+          <div class="stat-content">
+            <div class="stat-icon lived-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ calendarData.lived_weeks.toLocaleString() }}</div>
+              <div class="stat-label">Weeks Lived</div>
+            </div>
+          </div>
+          <div class="stat-progress">
+            <div class="progress-bar" :style="{ width: `${Math.round((calendarData.lived_weeks / calendarData.total_weeks) * 100)}%` }"></div>
+          </div>
         </div>
-        <div class="stat-item">
-          <div class="stat-number">{{ calendarData.total_weeks - calendarData.lived_weeks }}</div>
-          <div class="stat-label">Weeks Remaining</div>
+        
+        <div class="stat-card glass-card remaining-card">
+          <div class="stat-content">
+            <div class="stat-icon remaining-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+                <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
+                <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ (calendarData.total_weeks - calendarData.lived_weeks).toLocaleString() }}</div>
+              <div class="stat-label">Weeks Remaining</div>
+            </div>
+          </div>
+          <div class="stat-progress">
+            <div class="progress-bar remaining-progress" :style="{ width: `${Math.round(((calendarData.total_weeks - calendarData.lived_weeks) / calendarData.total_weeks) * 100)}%` }"></div>
+          </div>
         </div>
-        <div class="stat-item">
-          <div class="stat-number">{{ Math.round((calendarData.lived_weeks / calendarData.total_weeks) * 100) }}%</div>
-          <div class="stat-label">Life Lived</div>
+        
+        <div class="stat-card glass-card progress-card">
+          <div class="stat-content">
+            <div class="stat-icon progress-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 3v18h18" stroke="currentColor" stroke-width="2"/>
+                <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ Math.round((calendarData.lived_weeks / calendarData.total_weeks) * 100) }}%</div>
+              <div class="stat-label">Life Lived</div>
+            </div>
+          </div>
+          <div class="stat-progress">
+            <div class="progress-bar progress-progress" :style="{ width: `${Math.round((calendarData.lived_weeks / calendarData.total_weeks) * 100)}%` }"></div>
+          </div>
         </div>
-        <div class="stat-item">
-          <div class="stat-number">{{ Math.floor(calendarData.total_weeks / 52) }}</div>
-          <div class="stat-label">Total Years</div>
+        
+        <div class="stat-card glass-card years-card">
+          <div class="stat-content">
+            <div class="stat-icon years-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 10v12l5-3 5 3V10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 2a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ Math.floor(calendarData.total_weeks / 52) }}</div>
+              <div class="stat-label">Total Years</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Legend -->
-      <div class="legend">
-        <div class="legend-item">
-          <div class="legend-box lived"></div>
-          <span>Lived</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-box current"></div>
-          <span>Current Week</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-box future"></div>
-          <span>Future</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-box has-note"></div>
-          <span>Has Note</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-box year-start"></div>
-          <span>New Year</span>
+      <!-- Interactive Legend -->
+      <div class="legend-container">
+        <h3 class="legend-title">Legend</h3>
+        <div class="legend-grid">
+          <div class="legend-item">
+            <div class="legend-indicator lived"></div>
+            <span class="legend-text">Lived</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-indicator current"></div>
+            <span class="legend-text">Current Week</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-indicator future"></div>
+            <span class="legend-text">Future</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-indicator has-note"></div>
+            <span class="legend-text">Has Note</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-indicator year-start"></div>
+            <span class="legend-text">New Year</span>
+          </div>
         </div>
       </div>
 
       <!-- Calendar Grid -->
-      <div class="calendar-grid">
-        <div class="year-labels">
-          <div 
-            v-for="year in Math.ceil(calendarData.total_weeks / 52)" 
-            :key="year" 
-            class="year-label"
-          >
-            {{ new Date(props.userData.birthdate).getFullYear() + year - 1 }}
+      <div class="calendar-section">
+        <div class="calendar-grid">
+          <div class="year-labels">
+            <div 
+              v-for="year in Math.ceil(calendarData.total_weeks / 52)" 
+              :key="year" 
+              class="year-label"
+            >
+              {{ new Date(props.userData.birthdate).getFullYear() + year - 1 }}
+            </div>
           </div>
-        </div>
-        
-        <div class="weeks-grid">
-          <div 
-            v-for="week in calendarData.weeks" 
-            :key="week.week_number"
-            :class="getWeekClass(week)"
-            :title="`Week ${week.week_number} - ${formatDate(week.date)}`"
-            @click="openWeekModal(week)"
-          >
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Week Modal -->
-    <div v-if="showWeekModal" class="modal-overlay" @click="closeWeekModal">
-      <div class="modal" @click.stop>
-        <div class="modal-header">
-          <h3>Week {{ selectedWeek.week_number }}</h3>
-          <button class="close-btn" @click="closeWeekModal">×</button>
-        </div>
-        
-        <div class="modal-content">
-          <div class="week-info">
-            <p><strong>Date:</strong> {{ formatDate(selectedWeek.date) }}</p>
-            <p><strong>Year:</strong> {{ selectedWeek.year }}</p>
-            <p><strong>Status:</strong> 
-              <span :class="{ 
-                'status-lived': selectedWeek.is_lived,
-                'status-current': selectedWeek.is_current,
-                'status-future': !selectedWeek.is_lived && !selectedWeek.is_current
-              }">
-                {{ selectedWeek.is_current ? 'Current Week' : selectedWeek.is_lived ? 'Lived' : 'Future' }}
-              </span>
-            </p>
-          </div>
-
-          <div class="note-section">
-            <label for="week-note">Week Note:</label>
-            <textarea
-              id="week-note"
-              v-model="weekNote"
-              placeholder="Add a note about this week..."
-              rows="4"
-              class="note-textarea"
-            ></textarea>
-          </div>
-
-          <div class="modal-actions">
-            <button @click="closeWeekModal" class="btn btn-secondary">Cancel</button>
-            <button @click="saveWeekNote" class="btn btn-primary">Save Note</button>
+          
+          <div class="weeks-container">
+            <div class="weeks-grid">
+              <div 
+                v-for="week in calendarData.weeks" 
+                :key="week.week_number"
+                :class="getWeekClass(week)"
+                :title="`Week ${week.week_number} - ${formatDate(week.date)}${week.note ? '\nNote: ' + week.note : ''}`"
+                @click="openWeekModal(week)"
+                role="button"
+                :aria-label="`Week ${week.week_number}, ${week.is_current ? 'current week' : week.is_lived ? 'lived' : 'future'}`"
+                tabindex="0"
+                @keydown.enter="openWeekModal(week)"
+                @keydown.space.prevent="openWeekModal(week)"
+              >
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Modern Week Modal -->
+    <Teleport to="body">
+      <div v-if="showWeekModal" class="modal-backdrop" @click="closeWeekModal">
+        <div class="modal-container" @click.stop role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <div class="modal-header">
+            <h2 id="modal-title" class="modal-title">Week {{ selectedWeek.week_of_year }}, {{ selectedWeek.year }}</h2>
+            <button 
+              class="modal-close" 
+              @click="closeWeekModal"
+              aria-label="Close modal"
+            >
+              <span class="close-icon">×</span>
+            </button>
+          </div>
+          
+          <div class="modal-body">
+            <div class="week-details">
+              <div class="detail-item">
+                <span class="detail-label">Date</span>
+                <span class="detail-value">{{ formatDate(selectedWeek.date) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Year</span>
+                <span class="detail-value">{{ selectedWeek.year }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Status</span>
+                <span :class="getStatusClass(selectedWeek)" class="detail-status">
+                  {{ getStatusText(selectedWeek) }}
+                </span>
+              </div>
+            </div>
+
+            <div class="note-section">
+              <label for="week-note" class="note-label">Week Note</label>
+              <textarea
+                id="week-note"
+                v-model="weekNote"
+                placeholder="Add a note about this week..."
+                rows="4"
+                class="note-input"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button @click="closeWeekModal" class="btn btn-secondary">
+              Cancel
+            </button>
+            <button @click="saveWeekNote" class="btn btn-primary">
+              <span class="btn-icon">💾</span>
+              Save Note
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
+/* Main Container */
 .lifetime-calendar {
+  width: 100%;
   max-width: 100%;
-  margin: 0 auto;
 }
 
-.loading, .error {
+/* Loading State */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-20);
   text-align: center;
-  padding: 4rem 2rem;
-  font-size: 1.2rem;
 }
 
-.error {
-  color: #dc2626;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--color-border);
+  border-top: 4px solid var(--color-primary-500);
+  border-radius: var(--radius-full);
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--space-4);
 }
 
-.stats {
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Error State */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-20);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-error-200);
+}
+
+.error-icon {
+  font-size: var(--font-size-4xl);
+  margin-bottom: var(--space-4);
+}
+
+.error-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-error-600);
+  margin-bottom: var(--space-2);
+}
+
+.error-message {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-6);
+  max-width: 400px;
+}
+
+.retry-btn {
+  background: var(--color-error-500);
+  color: white;
+  border: none;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-lg);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.retry-btn:hover {
+  background: var(--color-error-600);
+  transform: translateY(-1px);
+}
+
+.retry-icon {
+  font-size: var(--font-size-lg);
+}
+
+/* Stats Grid */
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
 }
 
-.stat-item {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  transition: var(--duration-normal) var(--ease-out);
+  transition-property: transform, box-shadow, backdrop-filter;
 }
 
-.stat-number {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #667eea;
-  margin-bottom: 0.5rem;
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: var(--shadow-2xl);
+}
+
+.stat-content {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  position: relative;
+  z-index: 2;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--duration-normal) var(--ease-out);
+}
+
+.stat-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.5;
+}
+
+.lived-icon {
+  background: linear-gradient(135deg, var(--color-success-500), var(--color-success-600));
+  color: white;
+}
+
+.remaining-icon {
+  background: linear-gradient(135deg, var(--color-warning-500), var(--color-warning-600));
+  color: white;
+}
+
+.progress-icon {
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+  color: white;
+}
+
+.years-icon {
+  background: linear-gradient(135deg, var(--color-neutral-600), var(--color-neutral-700));
+  color: white;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+  line-height: var(--line-height-tight);
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
-  color: #666;
-  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  justify-content: center;
+.stat-progress {
+  height: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin: 0 var(--space-6) var(--space-4);
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--duration-slow) var(--ease-out);
+  background: linear-gradient(90deg, var(--color-success-500), var(--color-success-600));
+}
+
+.remaining-progress {
+  background: linear-gradient(90deg, var(--color-warning-500), var(--color-warning-600));
+}
+
+.progress-progress {
+  background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-600));
+}
+
+/* Card-specific hover effects */
+.lived-card:hover .lived-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.remaining-card:hover .remaining-icon {
+  transform: scale(1.1) rotate(-5deg);
+}
+
+.progress-card:hover .progress-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.years-card:hover .years-icon {
+  transform: scale(1.1) rotate(-5deg);
+}
+
+/* Legend */
+.legend-container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  padding: var(--space-6);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: var(--space-8);
+  transition: var(--duration-normal) var(--ease-out);
+}
+
+.legend-container:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+}
+
+.legend-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+  text-align: center;
+}
+
+.legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-4);
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: #666;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: var(--duration-fast) var(--ease-out);
 }
 
-.legend-box {
-  width: 16px;
-  height: 16px;
-  border: 1px solid #ddd;
-  border-radius: 2px;
+.legend-item:hover {
+  background: var(--color-background-secondary);
 }
 
-.legend-box.lived {
-  background: #4ade80;
-  border-color: #22c55e;
+.legend-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
 }
 
-.legend-box.current {
-  background: #f59e0b;
-  border-color: #d97706;
-  animation: pulse 2s infinite;
+.legend-indicator.lived {
+  background: var(--color-success-500);
+  border-color: var(--color-success-600);
 }
 
-.legend-box.future {
-  background: white;
-  border-color: #e5e7eb;
+.legend-indicator.current {
+  background: var(--color-warning-500);
+  border-color: var(--color-warning-600);
+  animation: pulse-gentle 2s infinite;
 }
 
-.legend-box.has-note {
-  background: white;
-  border-color: #e5e7eb;
-  box-shadow: inset 0 0 0 2px #8b5cf6;
+@keyframes pulse-gentle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-/* Legend sample for year start */
-.legend-box.year-start {
-  background: white;
-  border-color: #e5e7eb;
-  box-shadow: inset 3px 0 0 #3b82f6; /* blue tick on the left */
+.legend-indicator.future {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.legend-indicator.has-note {
+  background: var(--color-surface);
+  border-color: var(--color-primary-500);
+  box-shadow: inset 0 0 0 2px var(--color-primary-200);
+}
+
+.legend-indicator.year-start {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  position: relative;
+}
+
+.legend-indicator.year-start::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  bottom: -2px;
+  width: 4px;
+  background: var(--color-primary-500);
+  border-radius: var(--radius-sm);
+}
+
+.legend-text {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+/* Calendar Section */
+.calendar-section {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  transition: var(--duration-normal) var(--ease-out);
+}
+
+.calendar-section:hover {
+  box-shadow: var(--shadow-xl);
 }
 
 .calendar-grid {
-  background: white;
-  border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
+  padding: var(--space-6);
 }
 
 .year-labels {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex-shrink: 0;
+  min-width: 60px;
 }
 
 .year-label {
   height: 12px;
   display: flex;
   align-items: center;
-  font-size: 0.75rem;
-  color: #666;
-  padding-right: 0.5rem;
-  line-height: 1;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  padding-right: var(--space-2);
+  text-align: right;
+}
+
+.weeks-container {
+  flex: 1;
+  overflow-x: auto;
 }
 
 .weeks-grid {
   display: grid;
   grid-template-columns: repeat(52, 12px);
   gap: 2px;
-  flex: 1;
+  min-width: max-content;
 }
 
 .week-box {
   width: 12px;
   height: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   cursor: pointer;
-  transition: all 0.2s ease;
-  background: white;
-  position: relative; /* for year-start marker */
-}
-
-/* Visual marker for the first week of each year */
-.week-box.year-start {
-  box-shadow: inset 3px 0 0 #3b82f6; /* blue left tick */
-}
-
-.week-box:hover {
-  transform: scale(1.2);
-  border-color: #667eea;
-  z-index: 10;
+  transition: var(--duration-fast) var(--ease-out);
+  transition-property: transform, box-shadow, background-color, border-color;
   position: relative;
 }
 
+.week-box:hover {
+  transform: scale(1.4);
+  z-index: 10;
+  box-shadow: var(--shadow-lg);
+  border-width: 2px;
+}
+
+.week-box:focus {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+  z-index: 10;
+}
+
+.week-box:active {
+  transform: scale(1.2);
+}
+
 .week-box.lived {
-  background: #4ade80;
-  border-color: #22c55e;
+  background: linear-gradient(135deg, var(--color-success-500), var(--color-success-600));
+  border-color: var(--color-success-600);
+  box-shadow: 0 0 3px rgba(34, 197, 94, 0.3);
+}
+
+.week-box.lived:hover {
+  background: linear-gradient(135deg, var(--color-success-400), var(--color-success-500));
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
 }
 
 .week-box.current {
-  background: #f59e0b;
-  border-color: #d97706;
-  animation: pulse 2s infinite;
+  background: linear-gradient(135deg, var(--color-warning-500), var(--color-warning-600));
+  border-color: var(--color-warning-600);
+  animation: pulse-gentle 2s infinite;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.week-box.current:hover {
+  background: linear-gradient(135deg, var(--color-warning-400), var(--color-warning-500));
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
 }
 
 .week-box.has-note {
-  box-shadow: inset 0 0 0 2px #8b5cf6;
+  box-shadow: inset 0 0 0 2px var(--color-primary-500);
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+.week-box.year-start::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -1px;
+  bottom: -1px;
+  width: 3px;
+  background: var(--color-primary-500);
+  border-radius: var(--radius-sm);
 }
 
 /* Modal Styles */
-.modal-overlay {
+.modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: var(--space-4);
+  animation: fadeIn var(--duration-normal) var(--ease-out);
 }
 
-.modal {
-  background: white;
-  border-radius: 12px;
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to { 
+    opacity: 1; 
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+.modal-container {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-3xl);
+  box-shadow: var(--shadow-2xl);
   width: 100%;
-  max-width: 500px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  max-width: 520px;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: slideIn var(--duration-normal) var(--ease-out);
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-20px) scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+  }
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #eee;
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-background-secondary);
 }
 
-.modal-header h3 {
+.modal-title {
   margin: 0;
-  color: #333;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
-.close-btn {
+.modal-close {
   background: none;
   border: none;
-  font-size: 2rem;
-  color: #999;
+  color: var(--color-text-secondary);
   cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
+  padding: var(--space-2);
+  border-radius: var(--radius-full);
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
+  transition: var(--duration-fast) var(--ease-out);
 }
 
-.close-btn:hover {
-  background: #f5f5f5;
-  color: #666;
+.modal-close:hover {
+  background: var(--color-background-tertiary);
+  color: var(--color-text-primary);
 }
 
-.modal-content {
-  padding: 1.5rem;
+.close-icon {
+  font-size: var(--font-size-xl);
+  line-height: 1;
 }
 
-.week-info {
-  margin-bottom: 1.5rem;
+.modal-body {
+  padding: var(--space-6);
 }
 
-.week-info p {
-  margin-bottom: 0.5rem;
-  color: #333;
+.week-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--color-background-secondary);
+  border-radius: var(--radius-lg);
+}
+
+.detail-label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.detail-value {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.detail-status {
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .status-lived {
-  color: #22c55e;
-  font-weight: 600;
+  background: var(--color-success-100);
+  color: var(--color-success-700);
 }
 
 .status-current {
-  color: #f59e0b;
-  font-weight: 600;
+  background: var(--color-warning-100);
+  color: var(--color-warning-700);
 }
 
 .status-future {
-  color: #6b7280;
-  font-weight: 600;
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-600);
 }
 
 .note-section {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-6);
 }
 
-.note-section label {
+.note-label {
   display: block;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 0.5rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-sm);
 }
 
-.note-textarea {
+.note-input {
   width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-family: inherit;
+  padding: var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-sans);
   resize: vertical;
-  transition: border-color 0.2s ease;
+  min-height: 100px;
+  transition: var(--duration-fast) var(--ease-out);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
 }
 
-.note-textarea:focus {
+.note-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
 }
 
-.modal-actions {
+.note-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.modal-footer {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-3);
   justify-content: flex-end;
+  padding: var(--space-6);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-background-secondary);
 }
 
 .btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--duration-fast) var(--ease-out);
   border: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-background-tertiary);
+  color: var(--color-text-secondary);
 }
 
 .btn-secondary:hover {
-  background: #e5e7eb;
+  background: var(--color-border);
+  color: var(--color-text-primary);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary-500);
   color: white;
 }
 
 .btn-primary:hover {
+  background: var(--color-primary-600);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-icon {
+  font-size: var(--font-size-base);
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+  }
+  
+  .legend-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+  }
+  
   .calendar-grid {
-    padding: 1rem;
-    flex-direction: column;
+    padding: var(--space-4);
+    gap: var(--space-2);
   }
   
   .year-labels {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    min-width: 50px;
   }
   
   .year-label {
-    height: auto;
-    white-space: nowrap;
-    padding: 0.25rem 0.5rem;
-    background: #f3f4f6;
-    border-radius: 4px;
+    font-size: 10px;
   }
   
   .weeks-grid {
-    grid-template-columns: repeat(26, 1fr);
-    max-width: 100%;
+    grid-template-columns: repeat(52, 10px);
+    gap: 1px;
   }
   
   .week-box {
-    width: 100%;
-    height: 12px;
+    width: 10px;
+    height: 10px;
   }
   
-  .modal-actions {
+  .modal-container {
+    margin: var(--space-4);
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: var(--space-4);
+  }
+  
+  .modal-footer {
     flex-direction: column;
+  }
+  
+  .btn {
+    justify-content: center;
   }
 }
 
 @media (max-width: 480px) {
-  .weeks-grid {
-    grid-template-columns: repeat(13, 1fr);
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
   
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
+  .legend-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .weeks-grid {
+    grid-template-columns: repeat(52, 8px);
+    gap: 1px;
+  }
+  
+  .week-box {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .year-label {
+    font-size: 9px;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .status-lived {
+    background: var(--color-success-900);
+    color: var(--color-success-200);
+  }
+  
+  .status-current {
+    background: var(--color-warning-900);
+    color: var(--color-warning-200);
+  }
+  
+  .status-future {
+    background: var(--color-neutral-800);
+    color: var(--color-neutral-300);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .week-box,
+  .stat-card,
+  .modal-container,
+  .modal-backdrop {
+    animation: none;
+  }
+  
+  .week-box.current {
+    animation: none;
+  }
+  
+  .legend-indicator.current {
+    animation: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .week-box {
+    border-width: 2px;
+  }
+  
+  .legend-indicator {
+    border-width: 3px;
   }
 }
 </style>
