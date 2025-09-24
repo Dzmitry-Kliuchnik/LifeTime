@@ -112,6 +112,45 @@ const getStatusText = (week) => {
   return 'Future'
 }
 
+// Calculate year labels with proper row alignment
+const getYearLabels = () => {
+  if (!calendarData.value?.weeks) return []
+  
+  const labels = []
+  const weeks = calendarData.value.weeks
+  const totalYears = Math.ceil(weeks.length / 52)
+  
+  console.log(`Total weeks: ${weeks.length}, Total years: ${totalYears}`)
+  
+  // Create one label for each year of life (52 weeks each)
+  for (let yearIndex = 0; yearIndex < totalYears; yearIndex++) {
+    const startWeekIndex = yearIndex * 52
+    const endWeekIndex = Math.min(startWeekIndex + 52, weeks.length)
+    const yearWeeks = weeks.slice(startWeekIndex, endWeekIndex)
+    
+    if (yearWeeks.length === 0) continue
+    
+    // Count years in this row to find the dominant year
+    const yearCounts = {}
+    yearWeeks.forEach(week => {
+      yearCounts[week.year] = (yearCounts[week.year] || 0) + 1
+    })
+    
+    // Find the year with the most weeks in this row
+    const dominantYear = Object.keys(yearCounts).reduce((a, b) => 
+      yearCounts[a] > yearCounts[b] ? a : b
+    )
+    
+    labels.push({
+      year: parseInt(dominantYear),
+      rowIndex: yearIndex
+    })
+  }
+  
+  console.log('Year labels:', labels)
+  return labels
+}
+
 onMounted(() => {
   loadCalendarData()
 })
@@ -244,11 +283,11 @@ onMounted(() => {
         <div class="calendar-grid">
           <div class="year-labels">
             <div 
-              v-for="year in Math.ceil(calendarData.total_weeks / 52)" 
-              :key="year" 
+              v-for="yearLabel in getYearLabels()" 
+              :key="yearLabel.year" 
               class="year-label"
             >
-              {{ new Date(props.userData.birthdate).getFullYear() + year - 1 }}
+              {{ yearLabel.year }}
             </div>
           </div>
           
@@ -684,6 +723,9 @@ onMounted(() => {
   display: flex;
   gap: var(--space-4);
   padding: var(--space-6);
+  align-items: stretch;
+  /* Set week box size as a custom property for consistency */
+  --week-box-size: max(8px, min(1.2vw, 12px));
 }
 
 .year-labels {
@@ -692,10 +734,10 @@ onMounted(() => {
   gap: 2px;
   flex-shrink: 0;
   min-width: 60px;
+  align-items: flex-end;
 }
 
 .year-label {
-  height: 12px;
   display: flex;
   align-items: center;
   font-size: var(--font-size-xs);
@@ -703,6 +745,13 @@ onMounted(() => {
   color: var(--color-text-secondary);
   padding-right: var(--space-2);
   text-align: right;
+  justify-content: flex-end;
+  /* Each row contains exactly 52 weeks with gaps */
+  /* Height should match one row of the weeks grid */
+  flex: none;
+  /* Calculate height: week box height (matches one row height) */
+  height: var(--week-box-size);
+  margin: 0;
 }
 
 .weeks-container {
@@ -718,6 +767,8 @@ onMounted(() => {
 
 .week-box {
   aspect-ratio: 1;
+  width: var(--week-box-size);
+  height: var(--week-box-size);
   min-width: 8px;
   min-height: 8px;
   border-radius: var(--radius-sm);
@@ -1034,6 +1085,7 @@ onMounted(() => {
   .calendar-grid {
     padding: var(--space-4);
     gap: var(--space-2);
+    --week-box-size: max(6px, min(1vw, 10px));
   }
   
   .year-labels {
@@ -1080,6 +1132,10 @@ onMounted(() => {
   
   .legend-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .calendar-grid {
+    --week-box-size: max(4px, min(0.8vw, 6px));
   }
   
   .weeks-grid {
