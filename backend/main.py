@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import sqlite3
 import os
+import tempfile
+import uuid
 from typing import Optional, List
 
 app = FastAPI(title="Lifetime Calendar API")
@@ -65,6 +67,64 @@ class CalendarResponse(BaseModel):
     lived_weeks: int
     current_week: int
     weeks: List[dict]
+
+class VoiceTranscriptionResponse(BaseModel):
+    transcription: str
+    success: bool
+    error: Optional[str] = None
+
+# Temporary directories for audio files
+AUDIO_UPLOAD_DIR = tempfile.mkdtemp()
+
+def transcribe_audio_with_whisper(audio_file_path: str) -> str:
+    """
+    Transcribe audio using OpenAI Whisper API.
+    """
+    try:
+        import openai
+        
+        # Check if file exists and has content
+        if not os.path.exists(audio_file_path):
+            raise FileNotFoundError("Audio file not found")
+        
+        file_size = os.path.getsize(audio_file_path)
+        if file_size == 0:
+            return "Empty audio file detected."
+        
+        # Get OpenAI API key from environment
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            # For development, return mock transcription if no API key
+            return "[Mock Transcription] This is a placeholder transcription. Set OPENAI_API_KEY environment variable to use real Whisper."
+        
+        # Initialize OpenAI client
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Read and transcribe the audio file
+        with open(audio_file_path, 'rb') as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="text"
+            )
+        
+        # Return the transcribed text
+        return transcript.strip() if transcript else "No speech detected in audio."
+            
+    except Exception as e:
+        # If there's an error with the OpenAI API, fall back to mock
+        if "api_key" in str(e).lower() or "openai" in str(e).lower():
+            return "[Mock Transcription] OpenAI API not available. This is a placeholder transcription."
+        else:
+            raise Exception(f"Transcription failed: {str(e)}")
+
+def cleanup_temp_file(file_path: str):
+    """Clean up temporary audio file"""
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        print(f"Warning: Could not clean up temp file {file_path}: {e}")
 
 @app.get("/")
 async def root():
@@ -209,6 +269,99 @@ async def save_week_note(week_note: WeekNote):
         return {"message": "Week note saved successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/transcribe-voice")
+async def transcribe_voice(audio: UploadFile = File(...)):
+    """
+    Transcribe audio file using OpenAI Whisper and return the transcription text.
+    """
+    try:
+        # Validate file type
+        if not audio.content_type or not audio.content_type.startswith('audio/'):
+            raise HTTPException(status_code=400, detail="File must be an audio file")
+        
+        # Generate unique filename
+        file_id = str(uuid.uuid4())
+        file_extension = audio.filename.split('.')[-1] if '.' in audio.filename else 'webm'
+        temp_file_path = os.path.join(AUDIO_UPLOAD_DIR, f"{file_id}.{file_extension}")
+        
+        # Save uploaded file temporarily
+        with open(temp_file_path, "wb") as buffer:
+            content = await audio.read()
+            buffer.write(content)
+        
+        # Transcribe audio
+        try:
+            transcription = transcribe_audio_with_whisper(temp_file_path)
+            
+            return VoiceTranscriptionResponse(
+                transcription=transcription,
+                success=True
+            )
+            
+        except Exception as transcription_error:
+            return VoiceTranscriptionResponse(
+                transcription="",
+                success=False,
+                error=f"Transcription failed: {str(transcription_error)}"
+            )
+        
+        finally:
+            # Clean up temporary file
+            cleanup_temp_file(temp_file_path)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+@app.post("/api/week-note/voice")
+async def save_week_note_with_voice(
+    week_number: int,
+    year: int,
+    is_lived: bool,
+    existing_note: Optional[str] = None,
+    audio: UploadFile = File(...)
+):
+    """
+    Transcribe voice recording and append to existing week note.
+    """
+    try:
+        # First transcribe the audio
+        transcribe_response = await transcribe_voice(audio)
+        
+        if not transcribe_response.success:
+            raise HTTPException(status_code=400, detail=transcribe_response.error)
+        
+        # Combine existing note with transcription
+        transcribed_text = transcribe_response.transcription.strip()
+        
+        if existing_note and existing_note.strip():
+            combined_note = f"{existing_note.strip()}\n\n[Voice Note]: {transcribed_text}"
+        else:
+            combined_note = f"[Voice Note]: {transcribed_text}"
+        
+        # Create WeekNote object and save
+        week_note = WeekNote(
+            week_number=week_number,
+            year=year,
+            note=combined_note,
+            is_lived=is_lived
+        )
+        
+        # Save using existing function
+        await save_week_note(week_note)
+        
+        return {
+            "message": "Voice note transcribed and saved successfully",
+            "transcription": transcribed_text,
+            "combined_note": combined_note
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

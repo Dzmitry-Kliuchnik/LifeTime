@@ -15,6 +15,16 @@ const selectedWeek = ref(null)
 const showWeekModal = ref(false)
 const weekNote = ref('')
 
+// Voice recording state
+const isRecording = ref(false)
+const isTranscribing = ref(false)
+const recordingError = ref('')
+const mediaRecorder = ref(null)
+const audioChunks = ref([])
+const recordingStartTime = ref(null)
+const recordingDuration = ref(0)
+const recordingTimer = ref(null)
+
 const loadCalendarData = async () => {
   isLoading.value = true
   error.value = ''
@@ -40,6 +50,115 @@ const closeWeekModal = () => {
   showWeekModal.value = false
   selectedWeek.value = null
   weekNote.value = ''
+  // Clean up voice recording state
+  stopRecording()
+  recordingError.value = ''
+}
+
+// Voice recording functions
+const startRecording = async () => {
+  try {
+    recordingError.value = ''
+    
+    // Request microphone access
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    
+    // Create MediaRecorder
+    mediaRecorder.value = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+    audioChunks.value = []
+    
+    // Handle data available
+    mediaRecorder.value.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.value.push(event.data)
+      }
+    }
+    
+    // Handle recording stop
+    mediaRecorder.value.onstop = async () => {
+      const audioBlob = new Blob(audioChunks.value, { type: 'audio/webm' })
+      await transcribeAudio(audioBlob)
+      
+      // Clean up stream
+      stream.getTracks().forEach(track => track.stop())
+    }
+    
+    // Start recording
+    mediaRecorder.value.start()
+    isRecording.value = true
+    recordingStartTime.value = Date.now()
+    
+    // Start timer
+    recordingTimer.value = setInterval(() => {
+      recordingDuration.value = Math.floor((Date.now() - recordingStartTime.value) / 1000)
+    }, 1000)
+    
+  } catch (err) {
+    console.error('Error starting recording:', err)
+    recordingError.value = 'Could not access microphone. Please check your permissions.'
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder.value && isRecording.value) {
+    mediaRecorder.value.stop()
+    isRecording.value = false
+    
+    if (recordingTimer.value) {
+      clearInterval(recordingTimer.value)
+      recordingTimer.value = null
+    }
+    
+    recordingDuration.value = 0
+  }
+}
+
+const transcribeAudio = async (audioBlob) => {
+  if (!selectedWeek.value || !audioBlob) return
+  
+  try {
+    isTranscribing.value = true
+    
+    // Create FormData for file upload
+    const formData = new FormData()
+    formData.append('week_number', selectedWeek.value.week_of_year)
+    formData.append('year', selectedWeek.value.year)
+    formData.append('is_lived', selectedWeek.value.is_lived)
+    formData.append('existing_note', weekNote.value || '')
+    formData.append('audio', audioBlob, 'recording.webm')
+    
+    // Send to backend for transcription
+    const response = await axios.post(`${API_BASE}/api/week-note/voice`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    // Update the note with transcribed content
+    weekNote.value = response.data.combined_note
+    
+    // Update the week in calendar data
+    const weekIndex = calendarData.value.weeks.findIndex(w => 
+      w.week_number === selectedWeek.value.week_number
+    )
+    if (weekIndex !== -1) {
+      calendarData.value.weeks[weekIndex].note = response.data.combined_note
+    }
+    
+    recordingError.value = ''
+    
+  } catch (err) {
+    console.error('Error transcribing audio:', err)
+    recordingError.value = 'Failed to transcribe audio. Please try again.'
+  } finally {
+    isTranscribing.value = false
+  }
+}
+
+const formatRecordingTime = (seconds) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
 const saveWeekNote = async () => {
@@ -347,6 +466,40 @@ onMounted(() => {
 
             <div class="note-section">
               <label for="week-note" class="note-label">Week Note</label>
+              
+              <!-- Voice Recording Controls -->
+              <div class="voice-controls">
+                <div class="voice-buttons">
+                  <button 
+                    v-if="!isRecording && !isTranscribing"
+                    @click="startRecording"
+                    class="btn btn-voice"
+                    :disabled="isTranscribing"
+                  >
+                    <span class="btn-icon">🎤</span>
+                    Start Voice Note
+                  </button>
+                  
+                  <button 
+                    v-if="isRecording"
+                    @click="stopRecording"
+                    class="btn btn-recording"
+                  >
+                    <span class="btn-icon recording-pulse">⏹️</span>
+                    Stop Recording ({{ formatRecordingTime(recordingDuration) }})
+                  </button>
+                  
+                  <div v-if="isTranscribing" class="transcribing-indicator">
+                    <span class="btn-icon spinner">🔄</span>
+                    Transcribing...
+                  </div>
+                </div>
+                
+                <div v-if="recordingError" class="recording-error">
+                  {{ recordingError }}
+                </div>
+              </div>
+              
               <textarea
                 id="week-note"
                 v-model="weekNote"
@@ -1180,5 +1333,122 @@ onMounted(() => {
   .legend-indicator {
     border-width: 3px;
   }
+}
+
+/* Voice Recording Styles */
+.voice-controls {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.voice-buttons {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.btn-voice {
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+  color: white;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.btn-voice:hover {
+  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-voice:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-recording {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  animation: recording-pulse 1.5s infinite;
+}
+
+.btn-recording:hover {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+}
+
+.recording-pulse {
+  animation: pulse-icon 1s infinite;
+}
+
+@keyframes recording-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+  }
+}
+
+@keyframes pulse-icon {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+.transcribing-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-warning-100);
+  color: var(--color-warning-800);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.recording-error {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-error-100);
+  color: var(--color-error-800);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-2);
 }
 </style>
