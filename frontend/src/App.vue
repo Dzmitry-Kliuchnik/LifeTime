@@ -102,9 +102,6 @@ body {
 }
 
 .settings-btn {
-  position: absolute;
-  top: 2rem;
-  right: 2rem;
   background: rgba(255, 255, 255, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
@@ -113,6 +110,10 @@ body {
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.2s ease;
+  margin-top: 1rem;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .settings-btn:hover {
@@ -143,7 +144,6 @@ body {
   }
   
   .settings-btn {
-    position: static;
     margin-top: 1rem;
   }
   
