@@ -1153,40 +1153,6 @@ onMounted(() => {
   }
 }
 
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .status-lived {
-    background: var(--color-success-900);
-    color: var(--color-success-200);
-  }
-  
-  .status-current {
-    background: var(--color-warning-900);
-    color: var(--color-warning-200);
-  }
-  
-  .status-future {
-    background: var(--color-neutral-800);
-    color: var(--color-neutral-300);
-  }
-}
-
-/* Manual dark mode toggle support */
-[data-theme="dark"] .status-lived {
-  background: var(--color-success-900);
-  color: var(--color-success-200);
-}
-
-[data-theme="dark"] .status-current {
-  background: var(--color-warning-900);
-  color: var(--color-warning-200);
-}
-
-[data-theme="dark"] .status-future {
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-300);
-}
-
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   .week-box,
