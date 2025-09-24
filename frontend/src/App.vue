@@ -84,7 +84,7 @@ body {
 .header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 2rem;
+  padding: 2rem 8rem 2rem 2rem;
   text-align: center;
   position: relative;
 }
@@ -134,6 +134,10 @@ body {
 }
 
 @media (max-width: 768px) {
+  .header {
+    padding: 2rem 1rem;
+  }
+  
   .header h1 {
     font-size: 2rem;
   }
