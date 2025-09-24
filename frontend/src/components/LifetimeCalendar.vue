@@ -91,6 +91,11 @@ const getWeekClass = (week) => {
   if (week.note) {
     classes.push('has-note')
   }
+
+  // Mark the first week of each calendar year
+  if (week.week_of_year === 1) {
+    classes.push('year-start')
+  }
   
   return classes.join(' ')
 }
@@ -148,6 +153,10 @@ onMounted(() => {
         <div class="legend-item">
           <div class="legend-box has-note"></div>
           <span>Has Note</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box year-start"></div>
+          <span>New Year</span>
         </div>
       </div>
 
@@ -313,6 +322,13 @@ onMounted(() => {
   box-shadow: inset 0 0 0 2px #8b5cf6;
 }
 
+/* Legend sample for year start */
+.legend-box.year-start {
+  background: white;
+  border-color: #e5e7eb;
+  box-shadow: inset 3px 0 0 #3b82f6; /* blue tick on the left */
+}
+
 .calendar-grid {
   background: white;
   border-radius: 8px;
@@ -353,6 +369,12 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.2s ease;
   background: white;
+  position: relative; /* for year-start marker */
+}
+
+/* Visual marker for the first week of each year */
+.week-box.year-start {
+  box-shadow: inset 3px 0 0 #3b82f6; /* blue left tick */
 }
 
 .week-box:hover {
