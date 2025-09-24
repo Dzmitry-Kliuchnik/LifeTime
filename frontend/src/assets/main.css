@@ -30,12 +30,6 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  a:hover {
-    background-color: var(--color-primary-900);
-  }
-}
-
 .green {
   color: var(--color-success-600);
 }
@@ -43,12 +37,6 @@ a:focus-visible {
 .green:hover {
   color: var(--color-success-700);
   background-color: var(--color-success-50);
-}
-
-@media (prefers-color-scheme: dark) {
-  .green:hover {
-    background-color: var(--color-success-900);
-  }
 }
 
 /* Responsive Layout - Mobile First */
