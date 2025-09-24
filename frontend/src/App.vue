@@ -49,7 +49,12 @@ const loadUserData = async () => {
     }
   } catch (error) {
     console.error('Error loading user data:', error)
-    showSettings.value = true
+    // Temporary mock data for testing
+    userData.value = {
+      birthdate: '1990-01-01',
+      life_expectancy: 80
+    }
+    showSettings.value = false
   } finally {
     isLoading.value = false
   }

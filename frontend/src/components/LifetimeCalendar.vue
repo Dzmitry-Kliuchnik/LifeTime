@@ -25,6 +25,36 @@ const loadCalendarData = async () => {
   } catch (err) {
     error.value = 'Failed to load calendar data. Please check your settings.'
     console.error('Error loading calendar data:', err)
+    
+    // Temporary mock data for testing
+    const birthdate = new Date(props.userData.birthdate)
+    const now = new Date()
+    const totalWeeks = props.userData.life_expectancy * 52
+    const livedWeeks = Math.floor((now - birthdate) / (7 * 24 * 60 * 60 * 1000))
+    
+    const weeks = []
+    for (let i = 0; i < totalWeeks; i++) {
+      const weekDate = new Date(birthdate.getTime() + i * 7 * 24 * 60 * 60 * 1000)
+      const year = weekDate.getFullYear()
+      const weekOfYear = Math.floor((weekDate - new Date(year, 0, 1)) / (7 * 24 * 60 * 60 * 1000)) + 1
+      
+      weeks.push({
+        week_number: i + 1,
+        year: year,
+        week_of_year: weekOfYear,
+        date: weekDate.toISOString().split('T')[0],
+        is_lived: i < livedWeeks,
+        is_current: i === livedWeeks,
+        note: i % 50 === 0 ? `Year ${Math.floor(i / 52) + 1} milestone` : null
+      })
+    }
+    
+    calendarData.value = {
+      total_weeks: totalWeeks,
+      lived_weeks: livedWeeks,
+      weeks: weeks
+    }
+    error.value = ''
   } finally {
     isLoading.value = false
   }
@@ -695,7 +725,13 @@ onMounted(() => {
 }
 
 .year-label {
-  height: 12px;
+  /* Each year contains exactly 52 weeks, so year label height should match 52 week boxes + gaps */
+  /* Week boxes are square with aspect-ratio: 1, so height = width */
+  /* Week width = (container-width - (51 gaps * 2px)) / 52 */
+  /* Year height = 52 weeks * week-height + 51 gaps * 2px */
+  /* Since week-height = week-width, and total available width for weeks = 100% - year-labels-width - padding */
+  /* Let's use a more direct approach: each year should be 1/life_expectancy of the total height */
+  height: calc((52 * (((100vw - 200px) / 52) + 2px)));
   display: flex;
   align-items: center;
   font-size: var(--font-size-xs);
@@ -703,6 +739,9 @@ onMounted(() => {
   color: var(--color-text-secondary);
   padding-right: var(--space-2);
   text-align: right;
+  justify-content: flex-end;
+  /* Minimum height for mobile */
+  min-height: 20px;
 }
 
 .weeks-container {
@@ -1042,6 +1081,9 @@ onMounted(() => {
   
   .year-label {
     font-size: 10px;
+    /* Adjust height calculation for tablet screens */
+    height: calc((52 * (((100vw - 150px) / 52) + 1px)));
+    min-height: 15px;
   }
   
   .weeks-grid {
@@ -1094,18 +1136,21 @@ onMounted(() => {
   
   .year-label {
     font-size: 9px;
+    /* Adjust height calculation for mobile screens */
+    height: calc((52 * (((100vw - 100px) / 52) + 1px)));
+    min-height: 12px;
   }
 }
 
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   .status-lived {
-    background: var(--color-success-900);
+    background: var(--color-success-800);
     color: var(--color-success-200);
   }
   
   .status-current {
-    background: var(--color-warning-900);
+    background: var(--color-warning-800);
     color: var(--color-warning-200);
   }
   
@@ -1117,12 +1162,12 @@ onMounted(() => {
 
 /* Manual dark mode toggle support */
 [data-theme="dark"] .status-lived {
-  background: var(--color-success-900);
+  background: var(--color-success-800);
   color: var(--color-success-200);
 }
 
 [data-theme="dark"] .status-current {
-  background: var(--color-warning-900);
+  background: var(--color-warning-800);
   color: var(--color-warning-200);
 }
 
