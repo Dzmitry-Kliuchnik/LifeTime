@@ -60,9 +60,9 @@ if not exist ".requirements_installed" (
     echo. > .requirements_installed
 )
 
-REM Start backend in background
+REM Start backend in new window
 echo Starting FastAPI server on http://localhost:8000
-start /B cmd /c "python main.py > backend.log 2>&1"
+start "Lifetime Calendar - Backend" cmd /c "python main.py"
 
 REM Give backend time to start
 timeout /t 2 /nobreak >nul
@@ -81,9 +81,9 @@ if not exist "node_modules\" (
     call npm install
 )
 
-REM Start frontend in background
+REM Start frontend in new window
 echo Starting Vue.js development server on http://localhost:5173
-start /B cmd /c "npm run dev > frontend.log 2>&1"
+start "Lifetime Calendar - Frontend" cmd /c "npm run dev"
 
 REM Wait for servers to start
 timeout /t 3 /nobreak >nul
@@ -95,8 +95,8 @@ echo Frontend: http://localhost:5173
 echo Backend:  http://localhost:8000
 echo API Docs: http://localhost:8000/docs
 echo.
-echo Press Ctrl+C to stop both servers (you may need to close this window)
+echo Both servers are running in separate windows.
+echo Close those windows or press Ctrl+C in them to stop the servers.
 echo.
-
-REM Keep the window open
-pause
+echo You can now close this window.
+echo.
