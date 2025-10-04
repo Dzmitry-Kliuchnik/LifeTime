@@ -39,7 +39,30 @@ The application displays:
 - Node.js 16 or higher
 - npm or yarn
 
-### Backend Setup
+### Quick Start
+
+**For Linux/macOS:**
+```bash
+./start.sh
+```
+
+**For Windows:**
+```bash
+start.bat
+```
+
+The startup scripts will automatically:
+- Check for required dependencies (Python, Node.js, npm)
+- Create and activate a virtual environment for Python
+- Install backend dependencies (if needed)
+- Install frontend dependencies (if needed)
+- Start both backend and frontend servers
+
+### Manual Setup
+
+If you prefer to set up and run the servers manually:
+
+#### Backend Setup
 
 ```bash
 # Navigate to backend directory
@@ -58,7 +81,7 @@ python main.py
 
 The backend will be available at `http://localhost:8000`
 
-### Frontend Setup
+#### Frontend Setup
 
 ```bash
 # Navigate to frontend directory
