@@ -76,6 +76,10 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Uploads
+backend/uploads/
+uploads/
+
 # Logs
 *.log
 logs/

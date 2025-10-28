@@ -4,9 +4,11 @@ import tempfile
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Lifetime Calendar API")
@@ -22,6 +24,14 @@ app.add_middleware(
 
 # Database setup
 DB_PATH = "lifetime_calendar.db"
+
+# Image upload directory
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+# Allowed image extensions
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 
 
 def init_db():
@@ -43,6 +53,19 @@ def init_db():
             note TEXT,
             is_lived BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS note_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_number INTEGER NOT NULL,
+            year INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            original_filename TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            mime_type TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (week_number, year) REFERENCES week_notes(week_number, year)
         )
     """)
     conn.commit()
@@ -77,6 +100,15 @@ class VoiceTranscriptionResponse(BaseModel):
     transcription: str
     success: bool
     error: Optional[str] = None
+
+
+class NoteImage(BaseModel):
+    id: int
+    filename: str
+    original_filename: str
+    file_size: int
+    mime_type: str
+    created_at: str
 
 
 # Temporary directories for audio files
@@ -208,16 +240,40 @@ async def get_calendar_data():
         cursor = conn.cursor()
         cursor.execute("SELECT week_number, year, note, is_lived FROM week_notes")
         notes_data = cursor.fetchall()
+        
+        # Get all images for notes
+        cursor.execute("""
+            SELECT week_number, year, id, filename, original_filename, 
+                   file_size, mime_type, created_at 
+            FROM note_images 
+            ORDER BY created_at ASC
+        """)
+        images_data = cursor.fetchall()
         conn.close()
 
         # Create weeks data structure
         weeks = []
         notes_dict = {}
+        images_dict = {}
 
         # Convert notes to dictionary for quick lookup
         for note_data in notes_data:
             week_key = f"{note_data[1]}-{note_data[0]}"  # year-week_number
             notes_dict[week_key] = {"note": note_data[2], "is_lived": note_data[3]}
+        
+        # Convert images to dictionary grouped by week
+        for img_data in images_data:
+            week_key = f"{img_data[1]}-{img_data[0]}"  # year-week_number
+            if week_key not in images_dict:
+                images_dict[week_key] = []
+            images_dict[week_key].append({
+                "id": img_data[2],
+                "filename": img_data[3],
+                "original_filename": img_data[4],
+                "file_size": img_data[5],
+                "mime_type": img_data[6],
+                "created_at": img_data[7]
+            })
 
         # Generate weeks data
         current_week_date = birthdate
@@ -234,6 +290,7 @@ async def get_calendar_data():
                 "is_lived": week_num <= lived_weeks,
                 "is_current": week_num == current_week,
                 "note": notes_dict.get(week_key, {}).get("note", ""),
+                "images": images_dict.get(week_key, [])
             }
 
             weeks.append(week_data)
@@ -379,6 +436,146 @@ async def save_week_note_with_voice(
             "combined_note": combined_note,
         }
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+@app.post("/api/week-note/image")
+async def upload_image(
+    week_number: int = Form(...),
+    year: int = Form(...),
+    image: UploadFile = File(...)
+):
+    """
+    Upload an image for a specific week note.
+    """
+    try:
+        # Validate file type
+        if not image.content_type or not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Check file extension
+        file_ext = Path(image.filename).suffix.lower()
+        if file_ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File type not allowed. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        
+        # Read file content to check size
+        content = await image.read()
+        if len(content) > MAX_IMAGE_SIZE:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File too large. Maximum size: {MAX_IMAGE_SIZE / (1024 * 1024):.1f}MB"
+            )
+        
+        # Generate unique filename
+        file_id = str(uuid.uuid4())
+        filename = f"{file_id}{file_ext}"
+        file_path = UPLOAD_DIR / filename
+        
+        # Save file
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        # Save metadata to database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO note_images 
+            (week_number, year, filename, original_filename, file_size, mime_type) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            week_number, 
+            year, 
+            filename, 
+            image.filename, 
+            len(content), 
+            image.content_type
+        ))
+        image_id = cursor.lastrowid
+        conn.commit()
+        
+        # Get the created timestamp
+        cursor.execute("SELECT created_at FROM note_images WHERE id = ?", (image_id,))
+        created_at = cursor.fetchone()[0]
+        conn.close()
+        
+        return {
+            "message": "Image uploaded successfully",
+            "image": {
+                "id": image_id,
+                "filename": filename,
+                "original_filename": image.filename,
+                "file_size": len(content),
+                "mime_type": image.content_type,
+                "created_at": created_at
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+@app.get("/api/images/{filename}")
+async def get_image(filename: str):
+    """
+    Serve an uploaded image file.
+    """
+    try:
+        file_path = UPLOAD_DIR / filename
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        # Verify the file is in our upload directory (security check)
+        if not str(file_path.resolve()).startswith(str(UPLOAD_DIR.resolve())):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return FileResponse(file_path)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+@app.delete("/api/images/{image_id}")
+async def delete_image(image_id: int):
+    """
+    Delete an image by ID.
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Get image info
+        cursor.execute("SELECT filename FROM note_images WHERE id = ?", (image_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        filename = result[0]
+        
+        # Delete from database
+        cursor.execute("DELETE FROM note_images WHERE id = ?", (image_id,))
+        conn.commit()
+        conn.close()
+        
+        # Delete file from filesystem
+        file_path = UPLOAD_DIR / filename
+        if file_path.exists():
+            file_path.unlink()
+        
+        return {"message": "Image deleted successfully"}
+    
     except HTTPException:
         raise
     except Exception as e:
