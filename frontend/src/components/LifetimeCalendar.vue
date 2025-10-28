@@ -25,6 +25,14 @@ const recordingStartTime = ref(null)
 const recordingDuration = ref(0)
 const recordingTimer = ref(null)
 
+// Image upload state
+const isUploadingImage = ref(false)
+const uploadError = ref('')
+const imageFileInput = ref(null)
+const weekImages = ref([])
+const showImageGallery = ref(false)
+const selectedImageIndex = ref(0)
+
 const loadCalendarData = async () => {
   isLoading.value = true
   error.value = ''
@@ -43,6 +51,7 @@ const loadCalendarData = async () => {
 const openWeekModal = (week) => {
   selectedWeek.value = week
   weekNote.value = week.note || ''
+  weekImages.value = week.images || []
   showWeekModal.value = true
 }
 
@@ -50,9 +59,12 @@ const closeWeekModal = () => {
   showWeekModal.value = false
   selectedWeek.value = null
   weekNote.value = ''
+  weekImages.value = []
   // Clean up voice recording state
   stopRecording()
   recordingError.value = ''
+  uploadError.value = ''
+  showImageGallery.value = false
 }
 
 // Voice recording functions
@@ -159,6 +171,134 @@ const formatRecordingTime = (seconds) => {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// Image upload functions
+const triggerFileInput = () => {
+  imageFileInput.value?.click()
+}
+
+const handleImageSelect = async (event) => {
+  const files = event.target.files
+  if (!files || files.length === 0) return
+  
+  for (const file of files) {
+    await uploadImage(file)
+  }
+  
+  // Clear the input so the same file can be selected again
+  if (imageFileInput.value) {
+    imageFileInput.value.value = ''
+  }
+}
+
+const uploadImage = async (file) => {
+  if (!selectedWeek.value) return
+  
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    uploadError.value = 'Please select an image file'
+    return
+  }
+  
+  // Validate file size (5MB)
+  const maxSize = 5 * 1024 * 1024
+  if (file.size > maxSize) {
+    uploadError.value = 'Image size must be less than 5MB'
+    return
+  }
+  
+  try {
+    isUploadingImage.value = true
+    uploadError.value = ''
+    
+    const formData = new FormData()
+    formData.append('week_number', selectedWeek.value.week_of_year)
+    formData.append('year', selectedWeek.value.year)
+    formData.append('image', file)
+    
+    const response = await axios.post(`${API_BASE}/api/week-note/image`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    // Update the calendar data
+    const weekIndex = calendarData.value.weeks.findIndex(w => 
+      w.week_of_year === selectedWeek.value.week_of_year && w.year === selectedWeek.value.year
+    )
+    if (weekIndex !== -1) {
+      if (!calendarData.value.weeks[weekIndex].images) {
+        calendarData.value.weeks[weekIndex].images = []
+      }
+      calendarData.value.weeks[weekIndex].images.push(response.data.image)
+      // Update weekImages to reflect the change
+      weekImages.value = calendarData.value.weeks[weekIndex].images
+    }
+    
+  } catch (err) {
+    console.error('Error uploading image:', err)
+    uploadError.value = err.response?.data?.detail || 'Failed to upload image. Please try again.'
+  } finally {
+    isUploadingImage.value = false
+  }
+}
+
+const deleteImage = async (imageId, index) => {
+  if (!confirm('Are you sure you want to delete this image?')) return
+  
+  try {
+    await axios.delete(`${API_BASE}/api/images/${imageId}`)
+    
+    // Remove from weekImages
+    weekImages.value.splice(index, 1)
+    
+    // Update the calendar data
+    const weekIndex = calendarData.value.weeks.findIndex(w => 
+      w.week_of_year === selectedWeek.value.week_of_year && w.year === selectedWeek.value.year
+    )
+    if (weekIndex !== -1 && calendarData.value.weeks[weekIndex].images) {
+      const imgIndex = calendarData.value.weeks[weekIndex].images.findIndex(img => img.id === imageId)
+      if (imgIndex !== -1) {
+        calendarData.value.weeks[weekIndex].images.splice(imgIndex, 1)
+      }
+    }
+    
+  } catch (err) {
+    console.error('Error deleting image:', err)
+    uploadError.value = 'Failed to delete image. Please try again.'
+  }
+}
+
+const getImageUrl = (filename) => {
+  return `${API_BASE}/api/images/${filename}`
+}
+
+const openImageGallery = (index) => {
+  selectedImageIndex.value = index
+  showImageGallery.value = true
+}
+
+const closeImageGallery = () => {
+  showImageGallery.value = false
+}
+
+const nextImage = () => {
+  if (selectedImageIndex.value < weekImages.value.length - 1) {
+    selectedImageIndex.value++
+  }
+}
+
+const prevImage = () => {
+  if (selectedImageIndex.value > 0) {
+    selectedImageIndex.value--
+  }
+}
+
+const formatFileSize = (bytes) => {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 const saveWeekNote = async () => {
@@ -500,6 +640,58 @@ onMounted(() => {
                 </div>
               </div>
               
+              <!-- Image Upload Controls -->
+              <div class="image-controls">
+                <input
+                  ref="imageFileInput"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  @change="handleImageSelect"
+                  style="display: none"
+                />
+                
+                <button 
+                  @click="triggerFileInput"
+                  class="btn btn-image"
+                  :disabled="isUploadingImage"
+                >
+                  <span class="btn-icon">📷</span>
+                  {{ isUploadingImage ? 'Uploading...' : 'Add Images' }}
+                </button>
+                
+                <div v-if="uploadError" class="upload-error">
+                  {{ uploadError }}
+                </div>
+              </div>
+              
+              <!-- Image Gallery -->
+              <div v-if="weekImages.length > 0" class="images-grid">
+                <div 
+                  v-for="(image, index) in weekImages" 
+                  :key="image.id"
+                  class="image-item"
+                >
+                  <img 
+                    :src="getImageUrl(image.filename)" 
+                    :alt="image.original_filename"
+                    class="image-thumbnail"
+                    @click="openImageGallery(index)"
+                  />
+                  <button 
+                    @click="deleteImage(image.id, index)"
+                    class="image-delete-btn"
+                    title="Delete image"
+                  >
+                    ×
+                  </button>
+                  <div class="image-info">
+                    <span class="image-name">{{ image.original_filename }}</span>
+                    <span class="image-size">{{ formatFileSize(image.file_size) }}</span>
+                  </div>
+                </div>
+              </div>
+              
               <textarea
                 id="week-note"
                 v-model="weekNote"
@@ -519,6 +711,52 @@ onMounted(() => {
               Save Note
             </button>
           </div>
+        </div>
+      </div>
+    </Teleport>
+    
+    <!-- Image Gallery Modal -->
+    <Teleport to="body">
+      <div v-if="showImageGallery" class="modal-backdrop" @click="closeImageGallery">
+        <div class="gallery-container" @click.stop>
+          <button 
+            class="gallery-close" 
+            @click="closeImageGallery"
+            aria-label="Close gallery"
+          >
+            <span class="close-icon">×</span>
+          </button>
+          
+          <button 
+            v-if="selectedImageIndex > 0"
+            class="gallery-nav gallery-prev" 
+            @click="prevImage"
+            aria-label="Previous image"
+          >
+            ‹
+          </button>
+          
+          <div class="gallery-content">
+            <img 
+              v-if="weekImages[selectedImageIndex]"
+              :src="getImageUrl(weekImages[selectedImageIndex].filename)" 
+              :alt="weekImages[selectedImageIndex].original_filename"
+              class="gallery-image"
+            />
+            <div class="gallery-info">
+              <span class="gallery-counter">{{ selectedImageIndex + 1 }} / {{ weekImages.length }}</span>
+              <span class="gallery-filename">{{ weekImages[selectedImageIndex]?.original_filename }}</span>
+            </div>
+          </div>
+          
+          <button 
+            v-if="selectedImageIndex < weekImages.length - 1"
+            class="gallery-nav gallery-next" 
+            @click="nextImage"
+            aria-label="Next image"
+          >
+            ›
+          </button>
         </div>
       </div>
     </Teleport>
@@ -1450,5 +1688,302 @@ onMounted(() => {
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   margin-top: var(--space-2);
+}
+
+/* Image Upload Styles */
+.image-controls {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.btn-image {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: white;
+  border: none;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.btn-image:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-image:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.upload-error {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-error-100);
+  color: var(--color-error-800);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-2);
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.image-item {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  transition: var(--duration-fast) var(--ease-out);
+}
+
+.image-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.image-thumbnail {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  cursor: pointer;
+  transition: var(--duration-fast) var(--ease-out);
+}
+
+.image-thumbnail:hover {
+  opacity: 0.9;
+}
+
+.image-delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: rgba(220, 38, 38, 0.9);
+  color: white;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--duration-fast) var(--ease-out);
+  opacity: 0;
+}
+
+.image-item:hover .image-delete-btn {
+  opacity: 1;
+}
+
+.image-delete-btn:hover {
+  background: rgba(185, 28, 28, 0.9);
+  transform: scale(1.1);
+}
+
+.image-info {
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.image-name {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.image-size {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* Image Gallery Modal */
+.gallery-container {
+  position: relative;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-3xl);
+  box-shadow: var(--shadow-2xl);
+  width: 90vw;
+  max-width: 1200px;
+  height: 80vh;
+  max-height: 800px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: slideIn var(--duration-normal) var(--ease-out);
+}
+
+.gallery-close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--duration-fast) var(--ease-out);
+  z-index: 10;
+}
+
+.gallery-close:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
+}
+
+.gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-size: var(--font-size-3xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--duration-fast) var(--ease-out);
+  z-index: 10;
+}
+
+.gallery-nav:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.gallery-prev {
+  left: var(--space-4);
+}
+
+.gallery-next {
+  right: var(--space-4);
+}
+
+.gallery-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-20);
+}
+
+.gallery-image {
+  max-width: 100%;
+  max-height: calc(100% - 60px);
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+}
+
+.gallery-info {
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.gallery-counter {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.gallery-filename {
+  font-size: var(--font-size-xs);
+  opacity: 0.9;
+}
+
+/* Responsive adjustments for images */
+@media (max-width: 768px) {
+  .images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: var(--space-2);
+  }
+  
+  .image-thumbnail {
+    height: 100px;
+  }
+  
+  .gallery-container {
+    width: 95vw;
+    height: 85vh;
+  }
+  
+  .gallery-content {
+    padding: var(--space-12);
+  }
+  
+  .gallery-nav {
+    width: 40px;
+    height: 40px;
+    font-size: var(--font-size-2xl);
+  }
+}
+
+@media (max-width: 480px) {
+  .images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  }
+  
+  .image-thumbnail {
+    height: 80px;
+  }
+  
+  .gallery-nav {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .gallery-prev {
+    left: var(--space-2);
+  }
+  
+  .gallery-next {
+    right: var(--space-2);
+  }
 }
 </style>
