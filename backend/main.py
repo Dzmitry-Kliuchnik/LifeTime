@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import tempfile
 import uuid
@@ -528,14 +529,28 @@ async def get_image(filename: str):
     Serve an uploaded image file.
     """
     try:
+        # Validate filename to prevent path traversal attacks
+        # Only allow alphanumeric, dash, underscore and dot characters
+        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', filename):
+            raise HTTPException(status_code=400, detail="Invalid filename")
+        
+        # Prevent directory traversal
+        if '..' in filename or '/' in filename or '\\' in filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+        
         file_path = UPLOAD_DIR / filename
+        
+        # Verify the resolved path is within UPLOAD_DIR
+        try:
+            file_path_resolved = file_path.resolve()
+            upload_dir_resolved = UPLOAD_DIR.resolve()
+            if not str(file_path_resolved).startswith(str(upload_dir_resolved)):
+                raise HTTPException(status_code=403, detail="Access denied")
+        except (OSError, RuntimeError):
+            raise HTTPException(status_code=400, detail="Invalid path")
         
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Image not found")
-        
-        # Verify the file is in our upload directory (security check)
-        if not str(file_path.resolve()).startswith(str(UPLOAD_DIR.resolve())):
-            raise HTTPException(status_code=403, detail="Access denied")
         
         return FileResponse(file_path)
     
@@ -564,6 +579,15 @@ async def delete_image(image_id: int):
         
         filename = result[0]
         
+        # Validate filename before deletion (security check)
+        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', filename):
+            conn.close()
+            raise HTTPException(status_code=400, detail="Invalid filename in database")
+        
+        if '..' in filename or '/' in filename or '\\' in filename:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Invalid filename in database")
+        
         # Delete from database
         cursor.execute("DELETE FROM note_images WHERE id = ?", (image_id,))
         conn.commit()
@@ -571,6 +595,16 @@ async def delete_image(image_id: int):
         
         # Delete file from filesystem
         file_path = UPLOAD_DIR / filename
+        
+        # Verify the resolved path is within UPLOAD_DIR
+        try:
+            file_path_resolved = file_path.resolve()
+            upload_dir_resolved = UPLOAD_DIR.resolve()
+            if not str(file_path_resolved).startswith(str(upload_dir_resolved)):
+                raise HTTPException(status_code=403, detail="Access denied")
+        except (OSError, RuntimeError):
+            raise HTTPException(status_code=400, detail="Invalid path")
+        
         if file_path.exists():
             file_path.unlink()
         
