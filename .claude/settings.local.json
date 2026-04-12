@@ -1,9 +1,5 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(venv/Scripts/pip install httpx)",
-      "Bash(python3 -c \":*)",
-      "Bash(python -c \":*)"
-    ]
+  "enabledPlugins": {
+    "code-review@claude-plugins-official": true
   }
 }

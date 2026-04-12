@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, defineProps } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineProps } from 'vue'
 import axios from 'axios'
+import { computeEndDate, formatCountdown } from '@/utils/countdown.js'
 
 const props = defineProps({
   userData: Object
@@ -11,6 +12,8 @@ const API_BASE = 'http://127.0.0.1:8000'
 const calendarData = ref(null)
 const isLoading = ref(true)
 const error = ref('')
+const secondsRemaining = ref(0)
+let countdownTimer = null
 const selectedWeek = ref(null)
 const showWeekModal = ref(false)
 const weekNote = ref('')
@@ -39,6 +42,14 @@ const loadCalendarData = async () => {
     isLoading.value = false
   }
 }
+
+const computeSecondsRemaining = () => {
+  if (!props.userData?.birthdate || !props.userData?.life_expectancy) return
+  const endDate = computeEndDate(props.userData.birthdate, props.userData.life_expectancy)
+  secondsRemaining.value = Math.max(0, Math.floor((endDate - Date.now()) / 1000))
+}
+
+const formattedCountdown = computed(() => formatCountdown(secondsRemaining.value))
 
 const openWeekModal = (week) => {
   selectedWeek.value = week
@@ -272,6 +283,16 @@ const getYearLabels = () => {
 
 onMounted(() => {
   loadCalendarData()
+  if (props.userData?.birthdate && props.userData?.life_expectancy) {
+    computeSecondsRemaining()
+    countdownTimer = setInterval(computeSecondsRemaining, 1000)
+  }
+})
+
+onUnmounted(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
 })
 </script>
 
@@ -366,6 +387,24 @@ onMounted(() => {
               <div class="stat-value">{{ Math.floor(calendarData.total_weeks / 52) }}</div>
               <div class="stat-label">Total Years</div>
             </div>
+          </div>
+        </div>
+
+        <div class="stat-card glass-card seconds-card">
+          <div class="stat-content">
+            <div class="stat-icon seconds-icon">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                <polyline points="12 7 12 12 15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value seconds-value">{{ formattedCountdown }}</div>
+              <div class="stat-label">Seconds Remaining</div>
+            </div>
+          </div>
+          <div class="stat-progress">
+            <div class="progress-bar seconds-progress" :style="{ width: `${Math.round(((calendarData.total_weeks - calendarData.lived_weeks) / calendarData.total_weeks) * 100)}%` }"></div>
           </div>
         </div>
       </div>
@@ -692,6 +731,11 @@ onMounted(() => {
   color: white;
 }
 
+.seconds-icon {
+  background: linear-gradient(135deg, var(--color-error-500), var(--color-error-600));
+  color: white;
+}
+
 .stat-info {
   flex: 1;
 }
@@ -713,6 +757,10 @@ onMounted(() => {
   letter-spacing: 0.5px;
 }
 
+.seconds-value {
+  font-size: var(--font-size-xl);
+}
+
 .stat-progress {
   height: 4px;
   background: rgba(0, 0, 0, 0.1);
@@ -730,6 +778,10 @@ onMounted(() => {
 
 .remaining-progress {
   background: linear-gradient(90deg, var(--color-warning-500), var(--color-warning-600));
+}
+
+.seconds-progress {
+  background: linear-gradient(90deg, var(--color-error-500), var(--color-error-600));
 }
 
 .progress-progress {
@@ -751,6 +803,10 @@ onMounted(() => {
 
 .years-card:hover .years-icon {
   transform: scale(1.1) rotate(-5deg);
+}
+
+.seconds-card:hover .seconds-icon {
+  transform: scale(1.1) rotate(5deg);
 }
 
 /* Legend */

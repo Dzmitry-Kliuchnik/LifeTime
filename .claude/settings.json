@@ -1,7 +1,7 @@
 {
-  "permissions": {
-    "allow": [
-      "allow all bash commands"
-    ]
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": false,
+    "skill-creator@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true
   }
 }

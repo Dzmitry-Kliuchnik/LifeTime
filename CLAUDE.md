@@ -4,48 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Lifetime Calendar** — a full-stack app that visualizes a user's entire life as a grid of weeks. Built as a monorepo:
+Lifetime Calendar — a "Your Life in Weeks" visualizer. Users set their birthdate and life expectancy; the app renders every week of their life as a grid cell (lived/current/future), with per-week notes and a live countdown timer.
 
-- `backend/` — FastAPI service, SQLite persistence (`backend/main.py` is the sole entrypoint)
-- `frontend/` — Vue 3 + Vite SPA (`frontend/src/`)
+## Rules
 
-## Development Commands
+- @.claude/rules/architecture.md — backend, frontend structure and key files
+- @.claude/rules/commands.md — how to run and build each server
+- @.claude/rules/api.md — all backend REST endpoints
+- @.claude/rules/environment.md — environment variables
 
-### Quick Start
-```bash
-./start.sh        # Linux/macOS — starts both servers
-start.bat         # Windows — starts both servers
-```
+## Context7
 
-### Backend (manual)
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn backend.main:app --reload --port 8000
-```
+When writing code that uses any library or framework, use Context7 MCP to fetch current documentation before implementing. Run `resolve-library-id` then `query-docs` to get accurate API usage, method signatures, and patterns.
 
-### Frontend (manual)
-```bash
-cd frontend
-npm install
-npm run dev       # dev server on :5173
-npm run build     # production build to dist/
-npm run preview   # preview production build
-```
+## Memory
 
-**URLs:** Frontend `http://localhost:5173` | Backend `http://localhost:8000` | Swagger `http://localhost:8000/docs`
-
-## Key Facts
-
-- Voice transcription falls back to a mock string when `OPENAI_API_KEY` is not set
-- Node.js requirement: `^20.19.0 || >=22.12.0` (see `frontend/package.json`)
-
-## Project Skills
-
-Detailed reference content has been extracted into project skills in `.claude/skills/`:
-
-- **`lifetime-architecture`** — data flow, backend internals (DB, tables, calendar math), frontend file map, API base URL
-- **`lifetime-week-conventions`** — week object fields, week identity key, procedure for modifying week structure, CSS conventions
-- **`lifetime-best-practices`** — API design, security (CORS, SQL injection, secrets), error handling, frontend state consistency, env vars
+- @.claude/MEMORY.md — accumulated project notes, decisions, and context

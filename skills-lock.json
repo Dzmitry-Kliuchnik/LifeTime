@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "python-project-structure": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "a9c8b41e1a906a59d574c34e889d655c5dcc5137d13528ba02e5da3943d87f5b"
+    },
+    "youtube-summarizer": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "2c135b5a82769bfded8d761d44fe72fc7c4666dca2525808d08f37b6b4d24183"
+    }
+  }
+}
