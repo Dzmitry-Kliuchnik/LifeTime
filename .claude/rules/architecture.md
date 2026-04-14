@@ -11,11 +11,26 @@ Two completely separate servers — no monorepo tooling or shared code:
 
 The frontend calls the backend via axios with `API_BASE = 'http://127.0.0.1:8000'` hardcoded in `frontend/src/App.vue`. The SQLite database file (`lifetime_calendar.db`) lives in `backend/` at runtime.
 
-## Backend (`backend/main.py`)
+## Backend (`backend/`)
 
-Single-file FastAPI app. No ORM usage at runtime — all DB access is raw `sqlite3`. SQLAlchemy is listed in requirements but not actively used. Key models: `UserData` and `WeekNote`. The calendar computation (week grid generation) happens entirely in `GET /api/calendar`.
+FastAPI package under `backend/app/`. No ORM usage at runtime — all DB access is raw `sqlite3`. SQLAlchemy is listed in requirements but not actively used.
 
-Optional voice-to-text: `POST /api/transcribe-voice` and `POST /api/week-note/voice` use OpenAI Whisper. Without `OPENAI_API_KEY` in the environment, they return a mock transcription.
+```
+backend/
+├── app/
+│   ├── main.py          # app factory, CORS, router registration, startup
+│   ├── database.py      # get_db() context manager, init_db(), DB_PATH
+│   ├── schemas.py       # Pydantic models: UserData, WeekNote, CalendarResponse, VoiceTranscriptionResponse
+│   ├── routers/
+│   │   ├── user.py      # GET/POST /api/user
+│   │   ├── calendar.py  # GET /api/calendar (week grid generation)
+│   │   └── notes.py     # POST /api/week-note, /api/transcribe-voice, /api/week-note/voice
+│   └── services/
+│       └── voice.py     # transcribe_audio_with_whisper(), cleanup_temp_file()
+└── main.py              # thin entry point: uvicorn.run("app.main:app", ...)
+```
+
+Optional voice-to-text: `POST /api/transcribe-voice` and `POST /api/week-note/voice` use OpenAI Whisper (`app/services/voice.py`). Without `OPENAI_API_KEY` in the environment, they return a mock transcription.
 
 ## Frontend (`frontend/src/`)
 
